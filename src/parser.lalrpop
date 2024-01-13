@@ -1,0 +1,94 @@
+use hvmc::ast::*;
+use hvmc::run;
+use crate::repl::Repl;
+
+grammar;
+
+match {
+    r"[0-9]+"
+} else {
+    r"[a-zA-Z0-9_.]+",
+    _
+}
+
+pub Repl: Repl = {
+    <def:Def> => Repl::Def(def),
+    <net:Net> => Repl::Net(net),
+    ":r" => Repl::Reload,
+    ":q" => Repl::Quit,
+}
+
+pub Book: Book = {
+    => Book::new(),
+    <mut book:Book> <def:Def> => {
+        book.insert(def.0, def.1);
+        book
+    }
+}
+
+Def: (String, Net) = {
+    "@" <nam:Name> "=" <net:Net> => (String::from(nam), net),
+};
+
+Rdex: Vec<(Tree,Tree)> = {
+    => vec![],
+    <mut rdex:Rdex> "&" <l:Tree> "~" <r:Tree> => {
+        rdex.push((l, r));
+        rdex
+    },
+};
+Net: Net = {
+    <root:Tree> <rdex:Rdex> => Net { root, rdex },
+};
+
+Tree: Tree = {
+    <Var>,
+    <Ref>,
+    <Era>,
+    <Num>,
+    <Con>,
+    <Tup>,
+    <Dup>,
+    <Op2>,
+    <Op1>,
+};
+
+Op2: Tree = "<" <opr:Op> <l:Tree> <r:Tree> ">"
+    => Tree::Op2 { opr, lft: Box::new(l), rgt: Box::new(r) };
+Op1: Tree = "<" <lft:Number> <opr:Op> <r:Tree> ">"
+    => Tree::Op1 { opr, lft, rgt: Box::new(r) };
+
+Dup: Tree = "{" <lab:Number> <l:Tree> <r:Tree> "}"
+    => Tree::Dup { lab: lab as u32, lft: Box::new(l), rgt: Box::new(r) };
+Tup: Tree = "[" <l:Tree> <r:Tree> "]"
+    => Tree::Tup { lft: Box::new(l), rgt: Box::new(r) };
+Con: Tree = "(" <l:Tree> <r:Tree> ")"
+    => Tree::Con { lft: Box::new(l), rgt: Box::new(r) };
+Num: Tree = "#" <n:Number> => Tree::Num { val: n };
+Var: Tree = <Name> => Tree::Var { nam: String::from(<>) };
+Era: Tree = "*" => Tree::Era;
+Ref: Tree = "@" <Name> => Tree::Ref { nam: name_to_val(<>) };
+
+Name: &'input str = <s:r"[a-zA-Z0-9_.]+"> => s;
+Number: u64 = <n:r"[0-9]+"> => u64::from_str_radix(n, 10).unwrap();
+
+#[inline]
+Op: u32 = {
+    "+"  => run::ADD,
+    "-"  => run::SUB,
+    "*"  => run::MUL,
+    "/"  => run::DIV,
+    "%"  => run::MOD,
+    "==" => run::EQ,
+    "!=" => run::NE,
+    "<"  => run::LT,
+    ">"  => run::GT,
+    "<=" => run::LTE,
+    ">=" => run::GTE,
+    "&&" => run::AND,
+    "||" => run::OR,
+    "^"  => run::XOR,
+    "!"  => run::NOT,
+    "<<" => run::LSH,
+    ">>" => run::RSH,
+};

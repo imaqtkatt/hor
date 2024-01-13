@@ -1,0 +1,4 @@
+@id = (a a)
+@main = R
+  & @id ~ (a R)
+  & (a a) ~ (#32 a)
